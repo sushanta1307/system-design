@@ -58,7 +58,7 @@ class Question {
     User* author;
     list<Tag*> tags;
 public:
-    Question(string id, string title, string desc, User author) :
+    Question(string id, string title, string desc, User* author) :
         questionId(id), title(title), description(desc), author(author) {}
 
     string getQuestionId() {
@@ -122,12 +122,43 @@ class StackOverflow {
     map<string, Question*> questions;
     map<string, Answer*> answers;
     map<string, Tag*> tags;
+
+    int userIdCounter = 0;
+    int questionIdCounter = 0;
+    int answerIdCounter = 0;
 public:
-    void createUser();
-    void postQuestion();
-    void PostAnswer();
+    void createUser(string name, string email) {
+        User* user = new User("u" + to_string(userIdCounter), name, email);
+        userIdCounter++;
+        users[user->getUserId()] = user;
+    }
+
+    void postQuestion(string title, string desc, User* author) {
+        Question* question = new Question("q" + to_string(questionIdCounter), title, desc, author);
+        questionIdCounter++;
+        questions[question->getQuestionId()] = question;
+    }
+
+    void PostAnswer(string description, string authorId, string questionId) {
+        User* author = users[authorId];
+        Question* question = questions[questionId];
+        Answer* answer = new Answer("a" + to_string(answerIdCounter), description, author, question);
+        answerIdCounter++;
+        answers[answer->getAnswerId()] = answer;
+    }
+
     void searchQuestions();
-    list<Question*> getQuestionsByUser();
+
+    vector<Question*> getQuestionsByUser(string userId) {
+        User* user = users[userId];
+        vector<Question*> ans;
+        for(auto [_, question] : questions) {
+            if(question->getAuthor() == user) {
+                ans.push_back(question);
+            }
+        }
+        return ans;
+    }
 };
 
 
