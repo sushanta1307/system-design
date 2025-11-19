@@ -34,32 +34,16 @@ public:
 // Forward Declaration
 class Answer;
 
-class Tag {
-    string tagId;
-    string name;
-public:
-    Tag(string id, string name) :
-        tagId(id), name(name);
-
-    string getTagId() {
-        return tagId;
-    }
-
-    string getTagName() {
-        return name;
-    }
-};
-
 class Question {
     string questionId;
     string title;
     string description;
     list<Answer*> answers;
     User* author;
-    list<Tag*> tags;
+    list<string> tags;
 public:
-    Question(string id, string title, string desc, User* author) :
-        questionId(id), title(title), description(desc), author(author) {}
+    Question(string id, string title, string desc, User* author, list<string> tags) :
+        questionId(id), title(title), description(desc), author(author), tags(tags) {}
 
     string getQuestionId() {
         return questionId;
@@ -81,8 +65,12 @@ public:
         return answers;
     }
 
-    list<Tag*> listTags() {
+    list<string> listTags() {
         return tags;
+    }
+
+    void addAnswer(Answer* answer) {
+        answers.emplace_back(answer);
     }
 
     void displayInfo() {
@@ -114,6 +102,12 @@ public:
         return author;
     }
 
+    void displayInfo() {
+        cout<<"AnswerId: "<<answerId<<endl;
+        cout<<"Description: "<<description<<endl;
+        cout<<"Author: "<<author->getUserName()<<endl;
+    }
+
 };
 
 
@@ -121,33 +115,66 @@ class StackOverflow {
     map<string, User*> users;
     map<string, Question*> questions;
     map<string, Answer*> answers;
-    map<string, Tag*> tags;
 
     int userIdCounter = 0;
     int questionIdCounter = 0;
     int answerIdCounter = 0;
 public:
-    void createUser(string name, string email) {
+    User* createUser(string name, string email) {
         User* user = new User("u" + to_string(userIdCounter), name, email);
         userIdCounter++;
         users[user->getUserId()] = user;
+
+        return user;
     }
 
-    void postQuestion(string title, string desc, User* author) {
-        Question* question = new Question("q" + to_string(questionIdCounter), title, desc, author);
+    void displayUserProfile(string userId) {
+        User* user = users[userId];
+        user->displayInfo();
+    }
+
+    Question* postQuestion(string title, string desc, User* author, list<string> tags) {
+        Question* question = new Question("q" + to_string(questionIdCounter), title, desc, author, tags);
         questionIdCounter++;
         questions[question->getQuestionId()] = question;
+        return question;
     }
 
-    void PostAnswer(string description, string authorId, string questionId) {
+    Answer* postAnswer(string description, string authorId, string questionId) {
         User* author = users[authorId];
         Question* question = questions[questionId];
         Answer* answer = new Answer("a" + to_string(answerIdCounter), description, author, question);
         answerIdCounter++;
         answers[answer->getAnswerId()] = answer;
+        question->addAnswer(answer);
+        return answer;
     }
 
-    void searchQuestions();
+    void displayQuestion(string questionId) {
+        Question* question = questions[questionId];
+
+        question->displayInfo();
+        list<Answer*> answers = question->listAnswers();
+        
+        cout<<"Answers: \n";
+        for(Answer* answer: answers) {
+            answer->displayInfo();
+        }
+    }
+
+    vector<string> searchQuestions(string tag) {
+        vector<string> res;
+        for(auto [_, question]: questions) {
+            auto tags = question->listTags();
+            for(auto tg: tags) {
+                if(tg == tag) {
+                    res.push_back(question->getQuestionId());
+                }
+            }
+        }
+
+        return res;
+    }
 
     vector<Question*> getQuestionsByUser(string userId) {
         User* user = users[userId];
@@ -162,6 +189,73 @@ public:
 };
 
 
+int main() {
+    StackOverflow stackoverflow;
+    
+    // Register users
+    User* user1 = stackoverflow.createUser("john_doe", "john@email.com");
+    User* user2 = stackoverflow.createUser("alice_smith", "alice@email.com");
+    User* user3 = stackoverflow.createUser("bob_wilson", "bob@email.com");
+    
+    std::cout << "Initial users:" << std::endl;
+    stackoverflow.displayUserProfile(user1->getUserId());
+    
+    // Add questions
+    // std::vector<std::string> tags = {"c++", "programming"};
+    Question* question1 = stackoverflow.postQuestion(
+        "Smart Pointers",
+        "How do I use smart pointers in C++?",
+        user1,
+        {"C++", "Pointers"}
+    );
+    
+    // Add answers
+    Answer* answer1 = stackoverflow.postAnswer(
+        "Smart pointers automatically manage memory for you...",
+        user2->getUserId(),
+        question1->getQuestionId()
+    );
+    
+    Answer* answer2 = stackoverflow.postAnswer(
+        "There are three main types of smart pointers...",
+        user3->getUserId(),
+        question1->getQuestionId()
+    );
+    
+    // Add comments
+    // stackoverflow.addComment(
+    //     user1->getUserId(),
+    //     answer1->getPostId(),
+    //     "Thanks, that's helpful!"
+    // );
+    
+    // Vote on posts
+    // stackoverflow.votePost(user2->getUserId(), question1->getPostId());
+    // stackoverflow.votePost(user3->getUserId(), answer1->getPostId());
+    // stackoverflow.votePost(user1->getUserId(), answer2->getPostId());
+    
+    // Accept answer
+    // stackoverflow.acceptAnswer(user1->getUserId(), answer1->getPostId());
+    
+    // Display results
+    std::cout << "\nQuestion with answers:" << std::endl;
+    stackoverflow.displayQuestion(question1->getQuestionId());
 
+    
+    std::cout << "\nUser profiles after activity:" << std::endl;
+    stackoverflow.displayUserProfile(user1->getUserId());
+    stackoverflow.displayUserProfile(user2->getUserId());
+    
+    // Search questions
+    std::cout << "\nSearching for C++ questions:" << std::endl;
+    auto results = stackoverflow.searchQuestions("C++");
+    for (const auto& questionId : results) {
+        stackoverflow.displayQuestion(questionId);
+    }
+    
+    return 0;
+}
+
+// Question and Answer can be clubbed into Post class, with type QUESTION/ANSWER
 
 
