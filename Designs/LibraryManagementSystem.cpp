@@ -1,11 +1,7 @@
-// Add/Remove Books
-// Register new Members
-// Borrow/Return Books
-
 #include<iostream>
+#include<chrono>
 #include<list>
 using namespace std;
-
 class Book {
     string title;
     string author;
@@ -41,6 +37,7 @@ class Member {
     string name;
     string email;
     list<Book*> borrowedBooks;
+    const int MAX_BOOKS = 5;
 public:
     Member(string mId, string mName, string mEmail) :
         id(mId), name(mName), email(mEmail) {}
@@ -65,6 +62,10 @@ public:
     }
     list<Book*> getBorrowedBooks() {
         return borrowedBooks;
+    }
+
+    bool canBorrow() {
+        return borrowedBooks.size() < MAX_BOOKS;
     }
 
 };
@@ -93,26 +94,38 @@ public:
     }
 };
 
-class Loan {
+class Transaction {
     string id;
     Book* book;
     Member* member;
-    long long borrowDate;
-    long long dueDate;
-
+    string borrowDate;
+    string dueDate;
     bool isActive = true;
-    const int MAX_BORROW_DAYS = 15;
-    const int MAX_BOOKS_BORROWED = 3;
 public:
-    Loan(string lId, Book* b, Member* mem, long long bDate) :
-        id(lId), book(b), member(mem), borrowDate(bDate), dueDate(bDate+15) {}
+    Transaction(string lId, Book* b, Member* mem) :
+            id(lId), book(b), member(mem) {
+        auto now = chrono::system_clock::now();
+        auto tt = chrono::system_clock::to_time_t(now);
+        borrowDate = ctime(&tt);
 
-    void closeLoan() {
-        //TODO
+        long long days = 5;
+        std::chrono::hours hours_to_add(24 * days); // explicit hours type
+        std::chrono::system_clock::time_point future = now + hours_to_add;
+
+        std::time_t tt_future = std::chrono::system_clock::to_time_t(future);
+        dueDate = ctime(&tt_future);
     }
 
     string getId() {
         return id;
+    }
+
+    Book* getBook() {
+        return book;
+    }
+
+    Member* getMember() {
+        return member;
     }
 
 };
@@ -120,7 +133,9 @@ public:
 class LibraryManagementSystem {
     unordered_map<string, Member*> members;
     Catalog catalog;
-    unordered_map<string, Loan*> loans;
+    unordered_map<string, Transaction*> transactions;
+
+    int transactionIdCounter = 0;
 public:
 
 // add book, removebook, borrow book, return book, register member, search by author/title/isbn
@@ -144,11 +159,45 @@ public:
         return catalog.searchByIsbn(author);
     }
 
-    void borrowABook(string loanId, string memberName, string bookTitle) {
-        // check eligibilty
-        // curr timestamp is 100
+    void borrowABook(string memberName, string bookTitle) {
+        Member* member = members[memberName];
+
+        if(!member or !member->canBorrow()) return;
         
-        // loans[loanId] = new Loan(loanId, catalog.searchByTitle(), members[memberName], 100L);
+        for(auto &book: catalog.searchByTitle(bookTitle)) {
+            if(!book->isBookAvailable()) continue;
+
+            string transactionId = "l" + to_string(transactionIdCounter++);
+
+            transactions[transactionId] = new Transaction(transactionId, book, member);
+            book->setAvailabilityStatus(false);
+            member->addBorrowedBook(book);
+        }
+    }
+
+    void returnBook(string memberName, Book* book) {
+        Member* member = members[memberName];
+
+        if(!member or !book) return;
+        auto books = member->getBorrowedBooks();
+
+        auto it = find(books.begin(), books.end(), book);
+
+        if(it == books.end()) return;
+
+        book->setAvailabilityStatus(true);
+        member->removeBorrowedBook(book);
+
+        string loanId = "";
+
+        for(auto &[_, transaction]: transactions) {
+            if(transaction->getBook() == book and transaction->getMember() == member) {
+                loanId = transaction->getId();
+                break;
+            }
+        }
+
+        transactions.erase(loanId);
     }
 
 };
